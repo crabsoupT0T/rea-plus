@@ -5,6 +5,8 @@
  */
 
 import { Command } from 'commander';
+import { runProvider } from './providers/index.js';
+import { startMcpServer } from './mcp/server.js';
 
 const program = new Command();
 
@@ -17,19 +19,23 @@ program
   .command('analyze')
   .description('Analyze a target (JS/Electron, .NET, binary, etc.)')
   .argument('<path>', 'Path to the target')
-  .option('--type <type>', 'Target type (auto, electron, net, binary)', 'auto')
-  .action(async (path: string, options: { type: string }) => {
-    console.log(`Analyzing ${path} as ${options.type}...`);
-    // TODO: dispatch to providers
-    console.log('Analysis not yet implemented. See roadmap.');
+  .option('--provider <name>', 'Provider (auto, javascript, dotnet, ghidra)', 'auto')
+  .action(async (targetPath: string, options: { provider: string }) => {
+    try {
+      console.error(`Analyzing ${targetPath} with provider=${options.provider}...`);
+      const result = await runProvider(options.provider as any, targetPath);
+      console.log(JSON.stringify(result, null, 2));
+    } catch (err: any) {
+      console.error('Error:', err.message);
+      process.exit(1);
+    }
   });
 
 program
   .command('mcp')
   .description('Start the MCP server for coding agents')
   .action(async () => {
-    console.log('Starting MCP server...');
-    // TODO: launch MCP server
+    await startMcpServer();
   });
 
 program.parse();
