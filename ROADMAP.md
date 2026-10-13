@@ -1,23 +1,24 @@
 # REA-Plus Roadmap
 
-## Phase 1 — Core scaffolding (current)
+## Phase 1 — Core scaffolding
 - [x] Repository + package structure
-- [ ] Basic MCP server with tool registration
-- [ ] CLI skeleton
-- [ ] Evidence model
+- [x] Basic MCP server with tool registration
+- [x] CLI (analyze + mcp)
+- [x] Evidence model
 
 ## Phase 2 — High-value static targets
-- [ ] JavaScript / Electron static analysis (modules, IPC, source maps)
+- [x] JavaScript / Electron static analysis (files, IPC patterns, package.json)
 - [ ] .NET assembly inspection (metadata, CIL)
 - [ ] Simple string / symbol search
+- [ ] Deeper AST-based analysis for JS
 
 ## Phase 3 — Native providers
 - [ ] Ghidra headless bridge (decompile, xrefs, functions)
 - [ ] Optional Hopper support
-- [ ] Provider abstraction so new engines are easy to add
+- [x] Provider abstraction so new engines are easy to add
 
 ## Phase 4 — Agent experience
-- [ ] Agent skill / workflow instructions
+- [x] Agent skill / workflow instructions
 - [ ] Multi-step investigation templates
 - [ ] Richer evidence (call graphs, data flow hints)
 - [ ] Comparison and reconstruction helpers
