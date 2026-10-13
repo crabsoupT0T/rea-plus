@@ -13,30 +13,45 @@ Inspired by [REA (Reverse Engineer Anything)](https://github.com/morluto/rea), b
 - Extensible provider system so new engines can be plugged in
 - Better agent skills and multi-step investigation flows
 
-## Status
+## Current Status
 
-Early scaffold. Core architecture and MCP interface are being built out.
+Working (v0.1.0):
+- MCP server with `analyze` tool
+- CLI `analyze` and `mcp` commands
+- JavaScript / Electron static analysis provider (file inventory, IPC pattern detection, package.json)
+- Typed evidence model with confidence and limitations
+- Agent skill / workflow instructions (`skills/rea-plus/SKILL.md`)
+- Basic test
 
-## Quick Start (planned)
+Coming next: .NET provider, Ghidra headless bridge, richer AST analysis, caching, multi-provider comparison.
+
+## Quick Start
 
 ```bash
-npx rea-plus setup
-# or
-npm install -g rea-plus
-rea-plus --help
+# Clone and install
+git clone https://github.com/crabsoupT0T/rea-plus.git
+cd rea-plus
+npm install
+npm run build
+
+# Analyze a local JS/Electron app
+node dist/cli.js analyze /path/to/app --provider javascript
+
+# Or run MCP server for agents
+node dist/cli.js mcp
 ```
 
-## Architecture (high level)
+## Architecture
 
-- **MCP server**: Tools that agents call (analyze, decompile, xrefs, search, etc.)
-- **Providers**: Pluggable backends (Ghidra, Hopper, static JS parser, JADX, etc.)
-- **Evidence model**: Structured findings with provenance and limitations
-- **CLI**: Same capabilities without an agent
-- **Agent skills**: Workflow instructions that guide multi-step investigations
+- **MCP server** (`src/mcp/server.ts`): Tools agents call
+- **Providers** (`src/providers/`): Pluggable backends (javascript implemented; ghidra/dotnet stubs)
+- **Evidence model** (`src/evidence.ts`): Structured findings with provenance
+- **CLI** (`src/cli.ts`): Same capabilities without an agent
+- **Agent skills**: `skills/rea-plus/SKILL.md`
 
 ## Responsible Use
 
-Only analyze software you own or are explicitly authorized to examine. This project does not support DRM circumvention, license bypasses, unauthorized access, or copying protected code/assets.
+Only analyze software you own or are explicitly authorized to examine. This project does not support DRM circumvention, license bypasses, unauthorized access, or copying protected code/assets. See DISCLAIMER.md.
 
 ## License
 
@@ -44,4 +59,4 @@ MIT
 
 ## Contributing
 
-Contributions welcome. Start with issues or PRs for new providers, better evidence schemas, or agent workflow improvements.
+Contributions welcome. See ROADMAP.md. PRs for new providers, better evidence, or agent workflows are especially useful.
