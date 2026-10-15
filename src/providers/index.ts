@@ -3,6 +3,7 @@
  */
 
 import { analyzeJavaScriptApplication } from './javascript.js';
+import { analyzeDotNet } from './dotnet.js';
 
 export type ProviderName = 'javascript' | 'dotnet' | 'ghidra' | 'auto';
 
@@ -12,16 +13,17 @@ export async function runProvider(
 ): Promise<any> {
   switch (provider) {
     case 'javascript':
-    case 'auto':
       return analyzeJavaScriptApplication(targetPath);
     case 'dotnet':
-      return {
-        target: targetPath,
-        targetType: 'dotnet',
-        findings: [],
-        unresolved: [' .NET provider not yet implemented'],
-        warnings: ['Stub only'],
-      };
+      return analyzeDotNet(targetPath);
+    case 'auto':
+      // Prefer JS if directory looks like a Node/Electron project, otherwise try .NET
+      try {
+        const fs = await import('fs/promises');
+        const pkg = await fs.readFile(targetPath + '/package.json', 'utf8').catch(() => null);
+        if (pkg) return analyzeJavaScriptApplication(targetPath);
+      } catch { /* ignore */ }
+      return analyzeDotNet(targetPath);
     case 'ghidra':
       return {
         target: targetPath,
