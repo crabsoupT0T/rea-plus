@@ -1,6 +1,6 @@
 /**
  * Static analysis for JavaScript and Electron applications.
- * Scans directories or ASAR-like structures for modules, IPC, and key patterns.
+ * Scans directories for modules, IPC, preload, contextBridge, and key patterns.
  */
 
 import fs from 'fs/promises';
@@ -15,7 +15,7 @@ export async function analyzeJavaScriptApplication(targetPath: string): Promise<
   try {
     const stats = await fs.stat(targetPath);
     if (!stats.isDirectory()) {
-      warnings.push('Target is not a directory. Treating as single file or ASAR not yet supported.');
+      warnings.push('Target is not a directory. ASAR extraction not yet supported.');
       return {
         target: targetPath,
         targetType: 'javascript',
@@ -30,7 +30,7 @@ export async function analyzeJavaScriptApplication(targetPath: string): Promise<
       id: 'js-file-count',
       type: 'inventory',
       summary: `Found ${files.length} JavaScript-related files`,
-      details: { count: files.length, sample: files.slice(0, 10) },
+      details: { count: files.length, sample: files.slice(0, 15).map(f => path.relative(targetPath, f)) },
       provenance: {
         tool: 'rea-plus',
         provider: 'javascript',
@@ -38,21 +38,50 @@ export async function analyzeJavaScriptApplication(targetPath: string): Promise<
         timestamp: new Date().toISOString(),
       },
       confidence: 'high',
-      limitations: ['Shallow scan; does not parse full AST yet'],
+      limitations: ['Shallow scan; does not parse full AST'],
     });
 
-    // Look for common Electron / IPC patterns
-    const ipcFindings = await findIpcPatterns(targetPath, files);
-    findings.push(...ipcFindings);
+    // IPC patterns
+    findings.push(...await findPatterns(targetPath, files, {
+      idPrefix: 'ipc',
+      type: 'ipc',
+      regex: /(ipcMain|ipcRenderer)\.(on|handle|send|invoke|removeListener)/g,
+      summary: (rel) => `IPC usage detected in ${rel}`,
+      limit: 40,
+    }));
 
-    // Look for package.json / electron metadata
+    // contextBridge / preload patterns
+    findings.push(...await findPatterns(targetPath, files, {
+      idPrefix: 'context-bridge',
+      type: 'preload',
+      regex: /contextBridge\.exposeInMainWorld|preload:\s*['"`]/g,
+      summary: (rel) => `contextBridge or preload reference in ${rel}`,
+      limit: 30,
+    }));
+
+    // Electron app / BrowserWindow patterns
+    findings.push(...await findPatterns(targetPath, files, {
+      idPrefix: 'electron-app',
+      type: 'electron',
+      regex: /(new BrowserWindow|app\.(whenReady|on|quit)|Menu\.buildFromTemplate)/g,
+      summary: (rel) => `Electron main-process pattern in ${rel}`,
+      limit: 30,
+    }));
+
+    // package.json
     const pkg = await findPackageJson(targetPath);
     if (pkg) {
       findings.push({
         id: 'package-json',
         type: 'metadata',
         summary: 'Detected package.json',
-        details: pkg,
+        details: {
+          name: pkg.name,
+          version: pkg.version,
+          main: pkg.main,
+          dependencies: Object.keys(pkg.dependencies || {}).slice(0, 20),
+          electron: pkg.devDependencies?.electron || pkg.dependencies?.electron,
+        },
         provenance: {
           tool: 'rea-plus',
           provider: 'javascript',
@@ -81,7 +110,7 @@ async function scanJsFiles(dir: string, files: string[] = []): Promise<string[]>
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+    if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules' && entry.name !== 'dist') {
       await scanJsFiles(full, files);
     } else if (entry.isFile() && /\.(js|mjs|cjs|ts|jsx|tsx)$/.test(entry.name)) {
       files.push(full);
@@ -90,19 +119,29 @@ async function scanJsFiles(dir: string, files: string[] = []): Promise<string[]>
   return files;
 }
 
-async function findIpcPatterns(root: string, files: string[]): Promise<Evidence[]> {
+async function findPatterns(
+  root: string,
+  files: string[],
+  opts: {
+    idPrefix: string;
+    type: string;
+    regex: RegExp;
+    summary: (rel: string) => string;
+    limit: number;
+  }
+): Promise<Evidence[]> {
   const results: Evidence[] = [];
-  const ipcRegex = /(ipcMain|ipcRenderer)\.(on|handle|send|invoke)/g;
-  for (const file of files.slice(0, 50)) { // limit for performance
+  for (const file of files.slice(0, opts.limit)) {
     try {
       const content = await fs.readFile(file, 'utf8');
-      const matches = content.match(ipcRegex);
+      const matches = content.match(opts.regex);
       if (matches && matches.length > 0) {
+        const rel = path.relative(root, file);
         results.push({
-          id: `ipc-${path.basename(file)}`,
-          type: 'ipc',
-          summary: `IPC usage detected in ${path.relative(root, file)}`,
-          details: { matches: matches.slice(0, 5), file: path.relative(root, file) },
+          id: `${opts.idPrefix}-${path.basename(file)}-${results.length}`,
+          type: opts.type,
+          summary: opts.summary(rel),
+          details: { matches: matches.slice(0, 6), file: rel },
           provenance: {
             tool: 'rea-plus',
             provider: 'javascript',
@@ -110,7 +149,7 @@ async function findIpcPatterns(root: string, files: string[]): Promise<Evidence[
             timestamp: new Date().toISOString(),
           },
           confidence: 'medium',
-          limitations: ['Regex-based; may miss dynamic or minified calls'],
+          limitations: ['Regex-based; may miss dynamic or heavily minified calls'],
         });
       }
     } catch {
