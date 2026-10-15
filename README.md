@@ -18,17 +18,19 @@ Inspired by [REA (Reverse Engineer Anything)](https://github.com/morluto/rea), b
 Working (v0.1.0):
 - MCP server with `analyze` tool
 - CLI `analyze` and `mcp` commands
-- JavaScript / Electron static analysis provider (file inventory, IPC pattern detection, package.json)
+- JavaScript / Electron static analysis provider (file inventory, IPC, package.json)
+- Basic .NET assembly inspection
 - Typed evidence model with confidence and limitations
 - Agent skill / workflow instructions (`skills/rea-plus/SKILL.md`)
+- **Web interface** (`web/`) — paste a URL + describe what you need, get passive analysis + AI-ready prompt/code context
 - Basic test
 
-Coming next: .NET provider, Ghidra headless bridge, richer AST analysis, caching, multi-provider comparison.
+Coming next: Ghidra headless bridge, richer AST analysis, browser observation for dynamic sites, caching, multi-provider comparison.
 
 ## Quick Start
 
+### CLI / MCP
 ```bash
-# Clone and install
 git clone https://github.com/crabsoupT0T/rea-plus.git
 cd rea-plus
 npm install
@@ -41,12 +43,21 @@ node dist/cli.js analyze /path/to/app --provider javascript
 node dist/cli.js mcp
 ```
 
+### Web UI
+```bash
+cd web
+npm install
+npm run dev
+# open http://localhost:3000
+```
+
 ## Architecture
 
 - **MCP server** (`src/mcp/server.ts`): Tools agents call
-- **Providers** (`src/providers/`): Pluggable backends (javascript implemented; ghidra/dotnet stubs)
+- **Providers** (`src/providers/`): Pluggable backends (javascript + basic dotnet implemented; ghidra stub)
 - **Evidence model** (`src/evidence.ts`): Structured findings with provenance
 - **CLI** (`src/cli.ts`): Same capabilities without an agent
+- **Web app** (`web/`): URL + prompt interface for passive website analysis
 - **Agent skills**: `skills/rea-plus/SKILL.md`
 
 ## Responsible Use
