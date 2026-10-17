@@ -1,28 +1,40 @@
 # REA-Plus Web
 
-Web interface for pasting a website URL + describing what you need, then getting passive analysis evidence and an AI-ready prompt / starting code.
+Web interface: paste a website URL + describe what you need → AI generates reconstructed code.
 
 ## Run locally
 
 ```bash
 cd web
 npm install
+cp .env.example .env.local
+# Edit .env.local and add your OPENAI_API_KEY (or AI_API_KEY)
 npm run dev
 ```
 
 Open http://localhost:3000
 
+## AI setup
+
+The backend calls an OpenAI-compatible chat completions endpoint.
+
+- Set `OPENAI_API_KEY` (or `AI_API_KEY`)
+- Optional: `AI_API_BASE` (default `https://api.openai.com/v1`)
+- Optional: `AI_MODEL` (default `gpt-4o-mini`)
+
+Works with OpenAI, xAI Grok, OpenRouter, local proxies, etc.
+
 ## What it does
 
-- Accepts a public URL and a natural-language request
-- Performs a passive HTTP fetch (no JS execution, no cookies)
-- Extracts basic signals (title, scripts, forms, etc.)
-- Returns structured evidence + a ready-to-copy AI prompt that asks for reconstructed code
+1. Passive HTTP fetch of the URL
+2. Extracts basic evidence (title, scripts, forms, etc.)
+3. Sends evidence + your request to the AI
+4. Returns the generated reconstruction code + evidence
 
 ## Limitations
 
-- Passive only — does not execute JavaScript or capture dynamic network calls
-- Not a full reverse-engineering engine (for that, use the main CLI/MCP tools or local browser observation)
+- Passive only (no JS execution or dynamic network capture)
+- Requires your own AI API key
 - Only for authorized targets
 
 ## Responsible use
