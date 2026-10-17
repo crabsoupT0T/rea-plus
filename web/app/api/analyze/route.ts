@@ -8,7 +8,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Valid URL is required' }, { status: 400 });
     }
 
-    // Basic safety: only http/https, no obvious local/private ranges
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -19,9 +18,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
-    // Passive fetch (no JS execution, no cookies, short timeout)
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     let html = '';
     let status = 0;
@@ -40,18 +38,13 @@ export async function POST(req: NextRequest) {
       html = await res.text();
     } catch (err: any) {
       clearTimeout(timeout);
-      return NextResponse.json(
-        { error: `Fetch failed: ${err.message}` },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: `Fetch failed: ${err.message}` }, { status: 502 });
     }
     clearTimeout(timeout);
 
-    // Very basic extraction (no full DOM parser for simplicity)
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)/i);
     const scriptSrcs = [...html.matchAll(/<script[^>]+src=["']([^"']+)/gi)].map(m => m[1]).slice(0, 15);
-    const linkHrefs = [...html.matchAll(/<link[^>]+href=["']([^"']+)/gi)].map(m => m[1]).slice(0, 10);
     const forms = (html.match(/<form/gi) || []).length;
     const inputs = (html.match(/<input/gi) || []).length;
 
@@ -62,7 +55,6 @@ export async function POST(req: NextRequest) {
       description: metaDesc?.[1]?.trim() || null,
       scriptCount: scriptSrcs.length,
       scriptSrcs,
-      linkCount: linkHrefs.length,
       formCount: forms,
       inputCount: inputs,
       htmlLength: html.length,
@@ -74,36 +66,68 @@ export async function POST(req: NextRequest) {
       ],
     };
 
-    const aiPrompt = `You are helping reverse-engineer a public website the user is authorized to analyze.
+    const systemPrompt = `You are an expert reverse engineer helping the user reconstruct functionality from a public website they are authorized to analyze.
+Always mark output as a reconstruction, not original source. Be concise.`;
 
-Target URL: ${finalUrl}
-User request: ${prompt || '(no specific request)'}
+    const userMessage = `Target URL: ${finalUrl}
+User request: ${prompt || 'Provide a useful reconstruction of the main interactive parts.'}
 
 Evidence from passive inspection:
 ${JSON.stringify(evidence, null, 2)}
 
-Based on the evidence and the user's request, provide:
+Provide:
 1. A short explanation of how the relevant part likely works
-2. Clean, self-contained code that implements a similar feature (HTML/CSS/JS or React as appropriate)
-3. Note any limitations of the evidence
+2. Clean, self-contained code (prefer a single HTML file with embedded CSS/JS, or React if it clearly fits)
+3. Note limitations of the evidence
 
-Do not claim this is the original source. Mark it as a reconstruction.`;
+Do not claim this is the original source.`;
 
-    const suggestedCode = prompt
-      ? `// Reconstruction based on passive analysis of ${finalUrl}
-// User request: ${prompt}
-// This is NOT the original source — review and adapt.
+    let generatedCode: string | null = null;
+    let aiError: string | null = null;
 
-// TODO: Implement based on the evidence above
-console.log('Evidence available for AI to expand');
-`
-      : null;
+    const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+    const apiBase = process.env.AI_API_BASE || 'https://api.openai.com/v1';
+    const model = process.env.AI_MODEL || 'gpt-4o-mini';
+
+    if (apiKey) {
+      try {
+        const aiRes = await fetch(`${apiBase}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage },
+            ],
+            temperature: 0.4,
+            max_tokens: 2000,
+          }),
+        });
+
+        if (!aiRes.ok) {
+          const errText = await aiRes.text();
+          aiError = `AI API error: ${aiRes.status} ${errText.slice(0, 200)}`;
+        } else {
+          const aiData = await aiRes.json();
+          generatedCode = aiData.choices?.[0]?.message?.content || null;
+        }
+      } catch (err: any) {
+        aiError = `AI call failed: ${err.message}`;
+      }
+    } else {
+      aiError = 'No AI API key configured. Set OPENAI_API_KEY (or AI_API_KEY) in environment.';
+    }
 
     return NextResponse.json({
       evidence,
-      aiPrompt,
-      suggestedCode,
-      note: 'Passive analysis only. For full reverse engineering of dynamic behavior, use a local browser tool or REA with browser observation.',
+      generatedCode,
+      aiError,
+      aiConfigured: !!apiKey,
+      note: 'Passive analysis only. For dynamic sites use local browser tools.',
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal error' }, { status: 500 });
