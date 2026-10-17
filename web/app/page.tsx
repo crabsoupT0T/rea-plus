@@ -35,7 +35,7 @@ export default function Home() {
     <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 20px' }}>
       <h1 style={{ fontSize: 28, marginBottom: 8 }}>REA-Plus Web</h1>
       <p style={{ color: '#aaa', marginBottom: 24 }}>
-        Paste a public website URL and describe what you need. Get structured evidence + AI-ready context.
+        Paste a public website URL and describe what you need. AI generates reconstructed code.
         <br />
         <strong>Only analyze sites you own or are authorized to examine.</strong>
       </p>
@@ -50,14 +50,14 @@ export default function Home() {
           style={inputStyle}
         />
         <textarea
-          placeholder="What do you need? e.g. How does the search work? Extract the main form logic. Reimplement the hero section."
+          placeholder="What do you need? e.g. Reimplement the search form. Extract the hero section. How does the pricing calculator work?"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={4}
           style={inputStyle}
         />
         <button type="submit" disabled={loading} style={buttonStyle}>
-          {loading ? 'Analyzing…' : 'Analyze & Prepare Code Context'}
+          {loading ? 'Analyzing & generating…' : 'Analyze & Generate Code'}
         </button>
       </form>
 
@@ -65,18 +65,26 @@ export default function Home() {
 
       {result && (
         <section style={{ marginTop: 32 }}>
-          <h2>Analysis Evidence</h2>
-          <pre style={preStyle}>{JSON.stringify(result.evidence, null, 2)}</pre>
+          {!result.aiConfigured && (
+            <p style={{ color: '#fbbf24', marginBottom: 16 }}>
+              AI not configured. Set <code>OPENAI_API_KEY</code> (or <code>AI_API_KEY</code>) in your environment to enable code generation.
+            </p>
+          )}
+          {result.aiError && result.aiConfigured && (
+            <p style={{ color: '#ff6b6b' }}>AI error: {result.aiError}</p>
+          )}
 
-          <h2 style={{ marginTop: 24 }}>AI Prompt (copy this)</h2>
-          <pre style={preStyle}>{result.aiPrompt}</pre>
-
-          {result.suggestedCode && (
+          {result.generatedCode && (
             <>
-              <h2 style={{ marginTop: 24 }}>Suggested Starting Code</h2>
-              <pre style={preStyle}>{result.suggestedCode}</pre>
+              <h2>Generated Code (reconstruction)</h2>
+              <pre style={preStyle}>{result.generatedCode}</pre>
             </>
           )}
+
+          <h2 style={{ marginTop: 24 }}>Analysis Evidence</h2>
+          <pre style={preStyle}>{JSON.stringify(result.evidence, null, 2)}</pre>
+
+          <p style={{ color: '#888', marginTop: 16, fontSize: 14 }}>{result.note}</p>
         </section>
       )}
     </main>
